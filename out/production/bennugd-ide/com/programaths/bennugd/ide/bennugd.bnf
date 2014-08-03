@@ -1,0 +1,140 @@
+{
+    parserClass="com.programaths.bennugd.BennugdParser"
+  parserUtilClass="com.programaths.bennugd.BennugdParserUtil"
+
+    psiClassPrefix="Bgd"
+    psiImplClassSuffix="Impl"
+    psiPackage="com.programaths.bennugd.psi"
+    psiImplPackage="com.programaths.bennugd.psi.impl"
+
+    elementTypeHolderClass="com.programaths.bennugd.psi.BgdTypes"
+    elementTypeClass="com.programaths.bennugd.psi.BgdElementType"
+    tokenTypeClass="com.programaths.bennugd.psi.BgdTokenType"
+
+    psiImplUtilClass="com.programaths.bennugd.psi.BgdPsiImplUtil"
+
+    tokens=[
+       comment="regexp:(//.*|/\*.*\*/)"
+       string="regexp:('([^'\\]|\\.)*'|\"([^\"\\]|\\\"|\\\'|\\)*\")"
+       begin="begin"
+       break="break"
+       comma=','
+       case="case"
+       const="const"
+       continue="continue"
+       debug="debug"
+       declare="declare"
+       dup="dup"
+       elif="regexp:(elif|elseif)"
+       else="else"
+       end="end"
+       eq="="
+       for="for"
+       frame="regexp:(frame|yield)"
+       from="from"
+       function="function"
+       if="if"
+       import="import"
+       include="include"
+       lbracket="["
+       local="local"
+       loop="loop"
+       lpar="("
+       number="regexp:\d+"
+       onexit="onexit"
+       op_and="&&"
+       op_div="/"
+       op_gt=">"
+       op_gte=">="
+       op_lt="<"
+       op_lte="<="
+       op_minus="-"
+       op_mul="*"
+       op_or="||"
+       op_plus="+"
+       private="private"
+       process="process"
+       program="program"
+       public="public"
+       rbracket="]"
+       repeat="repeat"
+       return="return"
+       rpar=")"
+       semi=";"
+       sizeof="sizeof"
+       step="step"
+       struct="struct"
+       switch="switch"
+       to="to"
+       type="type"
+       until="until"
+       while="while"
+       id="regexp:[a-zA-Z0-9_]+"
+    ]
+}
+
+bennugd ::= program_statement? import_statement*  program_body*
+
+program_body ::= process_dec | func_dec | type_stm | struct_stm
+
+import_statement ::= import string {pin=1}
+
+program_statement ::= program string {pin=1}
+
+process_dec ::= process id process_vars  process_body   {pin=2 }
+
+process_vars ::= (proc_private? proc_public? proc_local?)
+
+process_body ::= begin statement* end {pin=1 recoverWhile=recover_proc_dec}
+
+func_dec ::= function id  function_vars function_body {pin=2}
+
+function_vars ::= proc_private?
+
+function_body ::= begin statement* end {pin=1 recoverWhile=recover_proc_dec}
+
+private recover_proc_dec ::= !(program_body)
+
+var_dec ::= var_type var_ref ('[' number ']' )* ';'  {methods=[getName]}
+
+var_type ::= '*'? ( 'int' | 'string' | 'byte' | type_ref )
+
+type_ref ::= id
+
+proc_public ::= public var_dec* {pin=1}
+
+proc_private ::= private var_dec* {pin=1}
+
+proc_local ::= local var_dec* {pin=1}
+
+var_ass ::= var_ref '='  ( string | arr_expr ) ';'
+
+comp_op ::= '=' | '>' | '<' | '>=' | '<='
+bin_bool_exp ::= arr_bool_exp comp_op arr_bool_exp | arr_bool_exp comp_op id_or_func_like | id_or_func_like comp_op id_or_func_like | id_or_func_like comp_op number
+conj_bol ::=  '(' bin_bool_exp ')' op_and bool_exp | '(' conj_bol ')' | bin_bool_exp op_and bool_exp
+disj_bol ::= '(' bin_bool_exp ')' op_or bool_exp | '(' disj_bol ')' | bin_bool_exp op_or bool_exp
+bool_exp ::=  conj_bol | disj_bol | bin_bool_exp
+
+ar_op ::= '*' | '/' | '+' | '-'
+arr_bool_exp ::= id_or_func_like ar_op id_or_func_like | id_or_func_like ar_op '(' arr_expr ')' | id_or_func_like ar_op number | number ar_op arr_expr | id_or_func_like | number
+arr_expr ::= '(' arr_expr ')' ar_op arr_expr | '(' arr_expr ')'  | arr_bool_exp
+
+// CONTROL STRUCTURE
+if_stm ::= if '(' bool_exp ')' statement* end {pin=2}
+for_stm ::= for '(' var_ass ';' bool_exp ';' var_ass ')' statement* end {pin=2 }
+from_stm ::= from id '=' arr_expr to arr_expr (step arr_expr)? ';' statement* end {pin=3 }
+loop_stm ::= loop statement* end {pin=1 }
+while_stm ::= while '(' bool_exp ')' statement* end {pin=2 }
+repeat_stm ::= repeat statement* until '(' bool_exp ')' {pin=2 }
+
+// Types
+type_stm ::= type id var_dec* end {pin=2}
+struct_stm ::= struct id var_dec* end {pin=2}
+
+id_or_func_like ::= var_ref ('(' args? ')')?
+
+var_ref ::= id
+
+statement::= var_ass |  if_stm | for_stm | from_stm | loop_stm | while_stm | repeat_stm | frame '(' arr_expr ')' ';' | frame ';' | id '(' args? ')' ';'
+args ::=  (var_ref | string | number) ',' args | var_ref | string | number
+
